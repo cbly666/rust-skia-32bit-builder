@@ -1,10 +1,65 @@
-name: Build 32-bit Skia Binaries
+name: Build Skia Binaries (Win32 & Win11 ARM64)
 
 on:
-  workflow_dispatch: # 支持在 GitHub 页面上点击按钮手动触发
+  workflow_dispatch:
+    inputs:
+      target:
+        description: '选择构建目标架构 (Target Architecture)'
+        required: true
+        default: 'aarch64-pc-windows-msvc'
+        type: choice
+        options:
+          - aarch64-pc-windows-msvc
+          - i686-pc-windows-msvc
+          - all
 
 jobs:
-  build:
+  build-arm64:
+    name: Build Windows 11 ARM64 Skia
+    if: github.event.inputs.target == 'all' || github.event.inputs.target == 'aarch64-pc-windows-msvc' || github.event.inputs.target == ''
+    runs-on: windows-11-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain & Target
+        run: |
+          rustup default stable
+          rustup target add aarch64-pc-windows-msvc
+
+      - name: Install Ninja
+        run: |
+          winget install Ninja-build.Ninja --accept-source-agreements --accept-package-agreements
+
+      - name: Build Skia ARM64 (from source on cloud)
+        run: |
+          cargo build --release --target aarch64-pc-windows-msvc
+
+      - name: Package Skia Binaries
+        shell: pwsh
+        run: |
+          # 寻找 skia-bindings 编译生成的 out 目录
+          $outDir = Get-ChildItem -Path "target\aarch64-pc-windows-msvc\release\build" -Filter "out" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          Write-Host "Found Skia Out Dir: $outDir"
+
+          # 创建标准 skia-binaries 根目录（避免用户解压后手动重命名）
+          New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
+          Copy-Item -Path "$outDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+
+          $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-aarch64-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
+          tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
+          Write-Host "Packaged successfully: dist\$tarName"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skia-arm64-binaries
+          path: dist/*.tar.gz
+
+  build-win32:
+    name: Build Windows 32-bit (x86) Skia
+    if: github.event.inputs.target == 'all' || github.event.inputs.target == 'i686-pc-windows-msvc'
     runs-on: windows-latest
 
     steps:
@@ -21,9 +76,8 @@ jobs:
           winget install Ninja-build.Ninja --accept-source-agreements --accept-package-agreements
           echo "C:\Program Files\NASM" >> $env:GITHUB_PATH
 
-      - name: Build Skia (from source on cloud)
+      - name: Build Skia 32-bit (from source on cloud)
         run: |
-          # windows-latest 自带完整的 LLVM / clang-cl，开箱即用
           $env:LLVM_HOME = "C:\Program Files\LLVM"
           cargo build --release --target i686-pc-windows-msvc
 
@@ -33,13 +87,13 @@ jobs:
           # 寻找 skia-bindings 编译生成的 out 目录
           $outDir = Get-ChildItem -Path "target\i686-pc-windows-msvc\release\build" -Filter "out" -Recurse | Select-Object -First 1 -ExpandProperty FullName
           Write-Host "Found Skia Out Dir: $outDir"
-          
-          # 创建打包目录
-          New-Item -ItemType Directory -Force -Path "dist"
-          
-          # 根据您之前报错里识别到的确切文件名进行打包
+
+          # 创建标准 skia-binaries 根目录（避免用户解压后手动重命名）
+          New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
+          Copy-Item -Path "$outDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+
           $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-i686-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
-          tar -czf "dist\$tarName" -C "$outDir" .
+          tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
           Write-Host "Packaged successfully: dist\$tarName"
 
       - name: Upload Artifact
