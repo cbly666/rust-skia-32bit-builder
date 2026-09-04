@@ -1,0 +1,49 @@
+name: Build 32-bit Skia Binaries
+
+on:
+  workflow_dispatch: # 支持在 GitHub 页面上点击按钮手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust 32-bit Target
+        run: |
+          rustup target add i686-pc-windows-msvc
+
+      - name: Install NASM & Ninja
+        run: |
+          winget install NASM.NASM --accept-source-agreements --accept-package-agreements
+          winget install Ninja-build.Ninja --accept-source-agreements --accept-package-agreements
+          echo "C:\Program Files\NASM" >> $env:GITHUB_PATH
+
+      - name: Build Skia (from source on cloud)
+        run: |
+          # windows-latest 自带完整的 LLVM / clang-cl，开箱即用
+          $env:LLVM_HOME = "C:\Program Files\LLVM"
+          cargo build --release --target i686-pc-windows-msvc
+
+      - name: Package Skia Binaries
+        shell: pwsh
+        run: |
+          # 寻找 skia-bindings 编译生成的 out 目录
+          $outDir = Get-ChildItem -Path "target\i686-pc-windows-msvc\release\build" -Filter "out" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          Write-Host "Found Skia Out Dir: $outDir"
+          
+          # 创建打包目录
+          New-Item -ItemType Directory -Force -Path "dist"
+          
+          # 根据您之前报错里识别到的确切文件名进行打包
+          $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-i686-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
+          tar -czf "dist\$tarName" -C "$outDir" .
+          Write-Host "Packaged successfully: dist\$tarName"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skia-32bit-binaries
+          path: dist/*.tar.gz

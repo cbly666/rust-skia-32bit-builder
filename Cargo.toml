@@ -1,0 +1,8 @@
+[package]
+name = "skia-prebuilder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 严格锁定与您项目中完全一致的版本
+skia-safe = "0.99.0"
