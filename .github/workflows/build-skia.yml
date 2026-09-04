@@ -28,9 +28,12 @@ jobs:
           rustup default stable
           rustup target add aarch64-pc-windows-msvc
 
-      - name: Install Ninja
+      - name: Ensure Ninja is installed
         run: |
-          winget install Ninja-build.Ninja --accept-source-agreements --accept-package-agreements
+          if (!(Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          ninja --version
 
       - name: Build Skia ARM64 (from source on cloud)
         run: |
@@ -72,9 +75,15 @@ jobs:
 
       - name: Install NASM & Ninja
         run: |
-          winget install NASM.NASM --accept-source-agreements --accept-package-agreements
-          winget install Ninja-build.Ninja --accept-source-agreements --accept-package-agreements
-          echo "C:\Program Files\NASM" >> $env:GITHUB_PATH
+          if (!(Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          if (!(Get-Command nasm -ErrorAction SilentlyContinue)) {
+            choco install nasm -y
+            echo "C:\Program Files\NASM" >> $env:GITHUB_PATH
+          }
+          ninja --version
+          nasm -v
 
       - name: Build Skia 32-bit (from source on cloud)
         run: |
