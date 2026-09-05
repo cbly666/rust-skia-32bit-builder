@@ -64,9 +64,10 @@ jobs:
           }
           Write-Host "OK: bindings.rs found at $bindingsFile"
 
-          # 创建标准 skia-binaries 根目录，直接拷贝 out\skia\* 下的所有文件（确保 bindings.rs 位于 skia-binaries/bindings.rs）
+          # 创建标准 skia-binaries 根目录
+          # 关键：只拷贝顶层纯文件（.lib, bindings.rs, .dat, .txt），严格排除 obj/、gen/ 等临时子目录，避免 Windows 解压时产生目录冲突 (os error 145)
           New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
-          Copy-Item -Path "$skiaDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+          Get-ChildItem -Path $skiaDir -File | Copy-Item -Destination "dist\staging\skia-binaries"
 
           $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-aarch64-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
           tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
@@ -132,9 +133,9 @@ jobs:
           }
           Write-Host "OK: bindings.rs found at $bindingsFile"
 
-          # 创建标准 skia-binaries 根目录，直接拷贝 out\skia\* 下的所有文件
+          # 创建标准 skia-binaries 根目录，只拷贝顶层纯文件
           New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
-          Copy-Item -Path "$skiaDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+          Get-ChildItem -Path $skiaDir -File | Copy-Item -Destination "dist\staging\skia-binaries"
 
           $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-i686-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
           tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
