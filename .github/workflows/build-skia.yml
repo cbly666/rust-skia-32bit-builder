@@ -42,13 +42,31 @@ jobs:
       - name: Package Skia Binaries
         shell: pwsh
         run: |
-          # 寻找 skia-bindings 编译生成的 out 目录
-          $outDir = Get-ChildItem -Path "target\aarch64-pc-windows-msvc\release\build" -Filter "out" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-          Write-Host "Found Skia Out Dir: $outDir"
+          # 定位 skia-bindings 编译生成的 out\skia 目录
+          # skia-bindings 官方约定：bindings.rs 和所有 .lib 必须直接位于 skia-binaries/ 根目录下（不能有多余的 skia 子目录）
+          $buildRoot = "target\aarch64-pc-windows-msvc\release\build"
+          $skiaBindingsDir = Get-ChildItem -Path $buildRoot -Directory `
+            | Where-Object { $_.Name -match "^skia-bindings-" } `
+            | Select-Object -First 1
+          if (-not $skiaBindingsDir) {
+            Write-Error "ERROR: Could not find skia-bindings-* directory under $buildRoot"
+            exit 1
+          }
+          $skiaDir = Join-Path $skiaBindingsDir.FullName "out\skia"
+          Write-Host "Found Skia Lib Dir: $skiaDir"
 
-          # 创建标准 skia-binaries 根目录（避免用户解压后手动重命名）
+          # 检查 bindings.rs 必须存在
+          $bindingsFile = Join-Path $skiaDir "bindings.rs"
+          if (-not (Test-Path $bindingsFile)) {
+            Write-Error "ERROR: bindings.rs not found at $bindingsFile"
+            Get-ChildItem -Path $skiaBindingsDir.FullName -Recurse | Select-Object FullName
+            exit 1
+          }
+          Write-Host "OK: bindings.rs found at $bindingsFile"
+
+          # 创建标准 skia-binaries 根目录，直接拷贝 out\skia\* 下的所有文件（确保 bindings.rs 位于 skia-binaries/bindings.rs）
           New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
-          Copy-Item -Path "$outDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+          Copy-Item -Path "$skiaDir\*" -Destination "dist\staging\skia-binaries" -Recurse
 
           $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-aarch64-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
           tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
@@ -93,13 +111,30 @@ jobs:
       - name: Package Skia Binaries
         shell: pwsh
         run: |
-          # 寻找 skia-bindings 编译生成的 out 目录
-          $outDir = Get-ChildItem -Path "target\i686-pc-windows-msvc\release\build" -Filter "out" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-          Write-Host "Found Skia Out Dir: $outDir"
+          # 定位 skia-bindings 编译生成的 out\skia 目录
+          $buildRoot = "target\i686-pc-windows-msvc\release\build"
+          $skiaBindingsDir = Get-ChildItem -Path $buildRoot -Directory `
+            | Where-Object { $_.Name -match "^skia-bindings-" } `
+            | Select-Object -First 1
+          if (-not $skiaBindingsDir) {
+            Write-Error "ERROR: Could not find skia-bindings-* directory under $buildRoot"
+            exit 1
+          }
+          $skiaDir = Join-Path $skiaBindingsDir.FullName "out\skia"
+          Write-Host "Found Skia Lib Dir: $skiaDir"
 
-          # 创建标准 skia-binaries 根目录（避免用户解压后手动重命名）
+          # 检查 bindings.rs 必须存在
+          $bindingsFile = Join-Path $skiaDir "bindings.rs"
+          if (-not (Test-Path $bindingsFile)) {
+            Write-Error "ERROR: bindings.rs not found at $bindingsFile"
+            Get-ChildItem -Path $skiaBindingsDir.FullName -Recurse | Select-Object FullName
+            exit 1
+          }
+          Write-Host "OK: bindings.rs found at $bindingsFile"
+
+          # 创建标准 skia-binaries 根目录，直接拷贝 out\skia\* 下的所有文件
           New-Item -ItemType Directory -Force -Path "dist\staging\skia-binaries"
-          Copy-Item -Path "$outDir\*" -Destination "dist\staging\skia-binaries" -Recurse
+          Copy-Item -Path "$skiaDir\*" -Destination "dist\staging\skia-binaries" -Recurse
 
           $tarName = "skia-binaries-a25a0fdb7d90429aa2d1-i686-pc-windows-msvc-jpegd-jpege-pdf.tar.gz"
           tar -czf "dist\$tarName" -C "dist\staging" skia-binaries
